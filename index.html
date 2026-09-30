@@ -51,12 +51,15 @@ button{font:inherit;color:inherit;cursor:pointer;border:0}.hidden{display:none!i
   </div>
 </div>
 <div id="hint">WASD move · mouse drag look · E / click mine · Space jump · Walk onto green pads to sell or blue portals to travel</div>
-<div id="toast"></div><button id="mine">⛏️</button>
+<div id="toast"></div><div id="fatal" class="hidden" style="position:fixed;inset:0;z-index:100;background:#050b14;color:#fff;display:grid;place-items:center;padding:25px;text-align:center"><div><h2>Gem Grinders failed to start</h2><p id="fatalText">Try refreshing the page.</p><button class="btn" onclick="location.reload()">Reload</button></div></div><button id="mine">⛏️</button>
 <div id="mobile"><div class="joy" id="joy"><i class="knob" id="knob"></i></div><div class="mobile-actions"><button id="mj">⬆️</button><button id="mm">⛏️</button></div></div>
 
 <div id="panel" class="hidden"><div class="window"><button class="close" id="close">✕</button><div id="panelContent"></div></div></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>window.addEventListener("error",function(e){if(String(e.message||"").includes("THREE")){document.body.insertAdjacentHTML("beforeend",'<div style="position:fixed;inset:0;display:grid;place-items:center;background:#07111f;color:white;font:700 18px system-ui;text-align:center;padding:30px;z-index:99999">Gem Grinders could not load its 3D engine.<br><small style="font-weight:400;opacity:.75">Check your internet connection and reload.</small></div>');}});</script>
+<script>if(typeof THREE==='undefined'){document.write('<script src="https://unpkg.com/three@0.128.0/build/three.min.js"><\/script>')}</script>
+<script>window.addEventListener("error",e=>{const f=document.getElementById("fatal");if(f){f.classList.remove("hidden");document.getElementById("fatalText").textContent="Error: "+(e.message||"Unknown error")}});</script>
 <script>
 const $=s=>document.querySelector(s), clamp=(n,a,b)=>Math.max(a,Math.min(b,n)), fmt=n=>{
  n=Math.floor(n); if(n<1000)return ''+n; const u=['K','M','B','T','Qa','Qi']; let i=-1; while(n>=1000&&i<u.length-1){n/=1000;i++}
@@ -135,13 +138,13 @@ function hatch(i){
  if(!candidates.length) {for(let k=0;k<PETS.length;k++)if(PETS[k][2]===rar)candidates.push(k)}
  const id=candidates[Math.floor(Math.random()*candidates.length)];S.pets[id]=(S.pets[id]||0)+1;
  if(S.equipped.length<3)S.equipped.push(id);
- toast=toast;toast('🥚 '+RAR[rar].name+' '+PETS[id][0]+'!');
+ toast('🥚 '+RAR[rar].name+' '+PETS[id][0]+'!');
  hud();save();openPets();
 }
 function togglePet(id){
  const at=S.equipped.indexOf(id);
  if(at>=0)S.equipped.splice(at,1); else if(S.equipped.length<3)S.equipped.push(id); else {toast('Equip up to 3 pets');return}
- hud();save();openPets();renderPets();
+ hud();save();rebuildPets();openPets();
 }
 function openPanel(title,body){
  $('#panelContent').innerHTML='<h2>'+title+'</h2>'+body;$('#panel').classList.remove('hidden');
@@ -181,9 +184,9 @@ function travel(i){
 window.travel=travel;window.buyUpgrade=buyUpgrade;window.hatch=hatch;window.togglePet=togglePet;window.doRebirth=doRebirth;
 $('#shopBtn').onclick=openShop;$('#petBtn').onclick=openPets;$('#questBtn').onclick=openQuests;$('#rebirthBtn').onclick=doRebirth;$('#close').onclick=closePanel;$('#panel').onclick=e=>{if(e.target.id==='panel')closePanel()};$('#saveBtn').onclick=save;
 
-const scene=new THREE.Scene(),renderer=new THREE.WebGLRenderer({antialias:true});
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x79cfff);const renderer=new THREE.WebGLRenderer({antialias:true});
 renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;$('#game').appendChild(renderer.domElement);
-const camera=new THREE.PerspectiveCamera(65,1,.1,800);const hemi=new THREE.HemisphereLight(0xffffff,0x17202d,.85);scene.add(hemi);
+const camera=new THREE.PerspectiveCamera(65,1,.1,800);scene.fog=new THREE.Fog(0x79cfff,80,260);const hemi=new THREE.HemisphereLight(0xffffff,0x17202d,.85);scene.add(hemi);
 const sun=new THREE.DirectionalLight(0xffffff,1.05);sun.castShadow=true;sun.shadow.mapSize.set(1024,1024);sun.shadow.camera.left=-45;sun.shadow.camera.right=45;sun.shadow.camera.top=45;sun.shadow.camera.bottom=-45;scene.add(sun);
 function resize(){renderer.setSize(innerWidth,innerHeight);camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix()}addEventListener('resize',resize);resize();
 const mats={};const M=c=>mats[c]||(mats[c]=new THREE.MeshLambertMaterial({color:c}));
@@ -291,7 +294,7 @@ function frame(now){
  const target=new THREE.Vector3(P.position.x,P.position.y+2.8,P.position.z),D=14;
  camera.position.set(target.x+Math.sin(yaw)*Math.cos(pitch)*D,target.y+Math.sin(pitch)*D,target.z+Math.cos(yaw)*Math.cos(pitch)*D);camera.lookAt(target);
  sun.position.set(P.position.x+30,50,P.position.z+20);sun.target.position.copy(P.position);
- skyNow.lerp(skyTarget,dt*2);scene.background=skyNow;scene.fog=new THREE.Fog(skyNow,80,260);
+ skyNow.lerp(skyTarget,dt*2);scene.background=skyNow;if(scene.fog){scene.fog.color.copy(skyNow)}
  petGroup.children.forEach((g,i)=>{const a=t*.9+i*2.1;g.position.lerp(new THREE.Vector3(P.position.x+Math.cos(a)*3,1.7+Math.sin(t*3+i)*.25,P.position.z+Math.sin(a)*3),dt*6)});
  for(let i=particles.length-1;i>=0;i--){const q=particles[i];q.life-=dt;q.v.y-=20*dt;q.m.position.addScaledVector(q.v,dt);if(q.life<=0){scene.remove(q.m);particles.splice(i,1)}}
  renderer.render(scene,camera);
